@@ -248,11 +248,15 @@ qa/        无头浏览器截图
 - 海盗：等级 = 星系危险度×2.5+1（最高 III），赏金 60-500+
 - 任务奖励：随科技等级与距离缩放
 
-## 十、游戏截图
+## 十、游戏截图（真实线上运行画面）
 
-| 主菜单 | 星系内飞行 | 银河星图 |
-|--------|-----------|----------|
-| ![主菜单](qa/menu-final.png) | ![飞行](qa/flight-final.png) | ![星图](qa/galaxy-final.png) |
+| | | |
+|---|---|---|
+| **主菜单** ![主菜单](qa/gallery-menu.png) | **星系内飞行** ![飞行](qa/gallery-flight.png) | **冰巨星特写** ![行星特写](qa/gallery-planet.png) |
+| **银河星图** ![星图](qa/gallery-galaxy.png) | **舰船设计器** ![设计器](qa/gallery-designer.png) | **空间站贸易** ![空间站](qa/gallery-station.png) |
+| **行星详情** ![行星详情](qa/gallery-planetdetail.png) | **遭遇战** ![战斗](qa/gallery-combat.png) | 　 |
+
+> 以上截图由无头浏览器对线上部署版真实运行采集（1920×1080@2x），并经视觉模型逐张质检（无黑屏/错位/乱码/面板重叠）。采集脚本：`test/screenshot-suite.js`。
 
 ## 十一、开源协议
 
