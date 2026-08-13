@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>星海远航 · STELLAR VOYAGER</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪐</text></svg>" />
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="ui" class="ui-layer">
+  <!-- 顶部: 系统信息 -->
+  <div id="hud-top" class="hud-top hidden">
+    <div id="sys-info" class="panel-chip"></div>
+    <div id="target-chip" class="panel-chip hidden"></div>
+    <div id="warnings" class="warnings"></div>
+  </div>
+
+  <!-- 左上: 提示 -->
+  <div id="hud-left" class="hud-left hidden">
+    <div id="mission-tracker" class="chip-list"></div>
+  </div>
+
+  <!-- 左下: 导航 -->
+  <div id="hud-nav" class="hud-nav hidden">
+    <div id="speed-readout" class="speed-readout"></div>
+    <div id="nav-hint" class="nav-hint"></div>
+  </div>
+
+  <!-- 底部: 舰船状态 -->
+  <div id="hud-bottom" class="hud-bottom hidden">
+    <div id="ship-stats" class="ship-stats"></div>
+  </div>
+
+  <!-- 右下: 操作按钮 -->
+  <div id="hud-actions" class="hud-actions hidden"></div>
+
+  <!-- 中央: 扫描/跃迁进度 -->
+  <div id="center-progress" class="center-progress hidden"></div>
+
+  <!-- 消息流 -->
+  <div id="toasts" class="toasts"></div>
+  <div id="modal-root" class="modal-root"></div>
+  <div id="tooltip" class="tooltip hidden"></div>
+</div>
+
+<script src="js/core/rand.js"></script>
+<script src="js/core/math.js"></script>
+<script src="js/core/input.js"></script>
+<script src="js/core/audio.js"></script>
+<script src="js/core/save.js"></script>
+<script src="js/core/engine.js"></script>
+<script src="js/core/ui.js"></script>
+<script src="js/data/names.js"></script>
+<script src="js/data/components.js"></script>
+<script src="js/data/ships.js"></script>
+<script src="js/world/planettex.js"></script>
+<script src="js/world/galaxy.js"></script>
+<script src="js/world/system.js"></script>
+<script src="js/render/starfield.js"></script>
+<script src="js/render/fx.js"></script>
+<script src="js/render/ship.js"></script>
+<script src="js/scenes/boot.js"></script>
+<script src="js/scenes/menu.js"></script>
+<script src="js/scenes/combat.js"></script>
+<script src="js/scenes/flight.js"></script>
+<script src="js/scenes/galaxymap.js"></script>
+<script src="js/scenes/designer.js"></script>
+<script src="js/scenes/station.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

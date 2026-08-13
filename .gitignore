@@ -1,0 +1,10 @@
+# 系统文件
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.lnk
+
+# 本地调试产物（qa 截图与测试脚本保留，便于复现 QA）
+node_modules/
+npm-debug.log*
+*.log
