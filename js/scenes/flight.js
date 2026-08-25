@@ -134,6 +134,10 @@
       this.statsEl.appendChild(crow);
       this.statRefs.cargo = { fill: crow.querySelector('i'), val: crow.querySelector('.val') };
 
+      // 雷达小地图
+      this.radarCv = UI.el('radar');
+      this.radarCtx = this.radarCv ? this.radarCv.getContext('2d') : null;
+
       UI.clear(this.actionsEl);
       const acts = [
         ['星图', 'M', () => this.goMap()],
@@ -156,6 +160,7 @@
 
     showHUD(v) {
       ['hud-top', 'hud-left', 'hud-nav', 'hud-bottom', 'hud-actions'].forEach(id => UI.toggle(UI.el(id), v));
+      UI.toggle(UI.el('radar'), v);
       UI.hide(UI.el('center-progress'));
     }
 
@@ -199,6 +204,8 @@
       // 低血量红色暗角脉冲
       const vg = document.getElementById('vignette');
       if (vg) vg.style.opacity = ship.hp.hull < hmax * 0.32 ? (0.22 + 0.13 * Math.sin(this.t * 5)).toFixed(2) : '0';
+
+      this.drawRadar();
 
       // 顶部目标
       if (this.target && this.target.hp) {
@@ -579,7 +586,7 @@
           }
           // 海盗伏击
           if (this.gsys.danger > 0.2 && this.pirates.filter(x => x.hp.hull > 0).length < 5 && Math.random() < 0.3) {
-            const pk = S.Combat.makePirate(new S.Rand((Math.random() * 0xffffffff) >>> 0), this.pirates[0]?.faction || '碎星掠夺者', Math.min(3, this.p.techLevel));
+            const pk = S.Combat.makePirate(new S.Rand((Math.random() * 0xffffffff) >>> 0), this.pirates[0]?.faction || '碎星掠夺者', Math.max(1, Math.min(4, this.p.techLevel - 1)));
             pk.x = ship.x + M.randomRange(-600, 600); pk.y = ship.y + M.randomRange(-600, 600);
             pk.angle = Math.atan2(ship.y - pk.y, ship.x - pk.x);
             pk.ai = { state: 'hunt', strafe: 1, wander: 0, faction: pk.faction };
@@ -1183,7 +1190,7 @@
       if (this.target && this.target.isPlanet && this.target.ref === p) {
         ctx.strokeStyle = 'rgba(77,210,255,0.8)';
         ctx.lineWidth = 2;
-        ctx.setLineDash([10, 6]);
+        ctx.setLineDash([10 / zoom, 6 / zoom]);
         ctx.beginPath(); ctx.arc(x, y, R + 12, 0, M.TAU); ctx.stroke();
         ctx.setLineDash([]);
       }
@@ -1201,7 +1208,7 @@
 
     /** 小行星精灵预烘焙（避免每帧重建多边形路径，低配机收益大） */
     makeRockSprite(pts, size, rare) {
-      const res = 2; // 2x 烘焙：缩小绘制开销与内存，画质对小行星足够
+      const res = 2;
       const half = Math.ceil(size * 1.35 * res) + 2;
       const s = document.createElement('canvas');
       s.width = s.height = half * 2;
@@ -1381,6 +1388,60 @@
         ctx.restore();
         ctx.globalAlpha = 1;
       }
+    }
+
+    /** 雷达小地图 */
+    drawRadar() {
+      const rc = this.radarCtx;
+      if (!rc) return;
+      const W = 360, R = W / 2;
+      const range = 3200;
+      rc.clearRect(0, 0, W, W);
+      rc.strokeStyle = 'rgba(90,140,220,0.25)';
+      rc.lineWidth = 2;
+      rc.beginPath(); rc.arc(R, R, R * 0.66, 0, M.TAU); rc.stroke();
+      rc.beginPath(); rc.arc(R, R, R * 0.33, 0, M.TAU); rc.stroke();
+      // 扫描线
+      const sweep = (this.t * 1.1) % M.TAU;
+      rc.strokeStyle = 'rgba(99,230,160,0.5)';
+      rc.beginPath(); rc.moveTo(R, R); rc.lineTo(R + Math.cos(sweep) * (R - 4), R + Math.sin(sweep) * (R - 4)); rc.stroke();
+      const dot = (wx, wy, color, r2) => {
+        let dx = (wx - this.ship.x) / range * R, dy = (wy - this.ship.y) / range * R;
+        const dd = Math.hypot(dx, dy);
+        let alpha = 0.95;
+        if (dd > R - 5) { dx *= (R - 5) / dd; dy *= (R - 5) / dd; alpha = 0.4; }
+        rc.globalAlpha = alpha;
+        rc.fillStyle = color;
+        rc.beginPath(); rc.arc(R + dx, R + dy, r2, 0, M.TAU); rc.fill();
+        rc.globalAlpha = 1;
+      };
+      for (const p of this.sys.planets) {
+        const wp = this.planetWorldPos(p);
+        dot(wp.x, wp.y, p.isGas ? '#6a8ac8' : '#4fa0e8', p.isGas ? 6 : 4);
+      }
+      const stn = this.sys.station;
+      const sa2 = stn.angle + S.G.time * stn.orbitSpeed;
+      dot(Math.cos(sa2) * stn.orbitRadius, Math.sin(sa2) * stn.orbitRadius, '#ffd479', 4);
+      if (this.rocks.length) {
+        rc.fillStyle = 'rgba(150,145,130,0.5)';
+        for (let i = 0; i < this.rocks.length; i += 6) {
+          const rk = this.rocks[i];
+          if (rk.ore <= 0) continue;
+          const dx = (rk.x - this.ship.x) / range * R, dy = (rk.y - this.ship.y) / range * R;
+          if (dx * dx + dy * dy > (R - 5) * (R - 5)) continue;
+          rc.fillRect(R + dx - 1.5, R + dy - 1.5, 3, 3);
+        }
+      }
+      for (const pk of this.pirates) {
+        if (pk.hp.hull <= 0) continue;
+        dot(pk.x, pk.y, '#ff5a68', 5);
+      }
+      rc.save();
+      rc.translate(R, R);
+      rc.rotate(this.ship.angle);
+      rc.fillStyle = '#8be6ff';
+      rc.beginPath(); rc.moveTo(9, 0); rc.lineTo(-5, -5.5); rc.lineTo(-5, 5.5); rc.closePath(); rc.fill();
+      rc.restore();
     }
 
     onLeave() {

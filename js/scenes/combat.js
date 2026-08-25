@@ -164,10 +164,13 @@
   function spawnPirates(system, galaxySys, player, techCap) {
     const list = [];
     if (!galaxySys || galaxySys.danger <= 0) return list;
-    const n = galaxySys.danger > 0.6 ? 3 : (galaxySys.danger > 0.3 ? 2 : 1);
+    const pt = Math.max(1, Math.min(5, techCap || 1));
+    // 数量随危险度与玩家科技提升（后期舰队更庞大）
+    const n = Math.min(5, (galaxySys.danger > 0.6 ? 3 : (galaxySys.danger > 0.3 ? 2 : 1)) + (pt >= 4 ? 1 : 0));
     const rng = new S.Rand((galaxySys.seed ^ 0x5f3759df) >>> 0);
     const faction = S.Names.pirateFaction(rng);
-    const tier = Math.min(3, 1 + Math.floor(galaxySys.danger * 2.5));
+    // 等级随星系危险度与玩家科技共同成长：玩家到 IV 级时海盗不掉队
+    const tier = Math.min(4, Math.max(1 + Math.floor(galaxySys.danger * 2.5), pt - 1));
     for (let i = 0; i < n; i++) {
       const ship = makePirate(rng, faction, tier);
       // 出生在带内或外环
@@ -188,17 +191,21 @@
   }
 
   function makePirate(rng, faction, tier) {
-    const comps = ['rea' + tier, 'thr' + tier, 'cpu' + tier, 'sen' + tier];
-    if (tier >= 2) comps.push('hyp' + tier);
-    const kin = 'kin_s' + Math.min(tier, 2);
-    comps.push(kin, kin, 'pd_s' + Math.min(tier, 2));
-    comps.push('shd' + Math.min(tier, 2), 'arm' + Math.min(tier, 2));
-    if (tier >= 3) comps.push('kin_m' + Math.min(tier, 4), 'shd3');
-    const design = { id: 'pirate', name: faction, hullId: 'corvette', comps };
+    const t = Math.min(4, Math.max(1, tier));
+    // IV 级海盗升级为驱逐舰舰体
+    const hullId = t >= 4 ? 'destroyer' : 'corvette';
+    const comps = ['rea' + (t >= 4 ? 5 : t), 'thr' + t, 'cpu' + t, 'sen' + t, 'hyp' + t];
+    const kin = 'kin_s' + t;
+    if (hullId === 'corvette') comps.push(kin, kin); else comps.push(kin);
+    comps.push('pd_s' + t);
+    comps.push('shd' + Math.min(t, 3), 'arm' + Math.min(t, 3));
+    if (t >= 3) comps.push('mis_m' + Math.min(t, 5));
+    if (t >= 4) { comps.push('ene_m4', 'aux4'); }
+    const design = { id: 'pirate', name: faction, hullId, comps };
     const ship = S.makeShip(design, S.Names.ship(rng));
     ship.isPirate = true;
     ship.faction = faction;
-    ship.bounty = Math.round(60 + tier * 90 + rng.range(0, 80));
+    ship.bounty = Math.round(60 + t * 110 + rng.range(0, 80));
     return ship;
   }
 
