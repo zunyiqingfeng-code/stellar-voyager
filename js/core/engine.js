@@ -28,6 +28,9 @@
       this.canvas.style.height = this.height + 'px';
     }
 
+    /** 屏幕震动（CSS 像素强度，自动衰减） */
+    addShake(v) { this.shake = Math.min(16, (this.shake || 0) + v); }
+
     _sceneError(stage, err) {
       // 场景异常隔离：记录但不中断主循环
       if (typeof console !== 'undefined') console.error('[' + this.currentName + '.' + stage + ']', err);
@@ -72,6 +75,7 @@
       this.last = ts;
       dt = Math.min(Math.max(dt, 1 / 120), 1 / 20);
       this.time += dt; this.frame++;
+      if (this.shake > 0.05) this.shake *= Math.exp(-5 * dt); else this.shake = 0;
 
       // 帧率统计
       this._fpsAcc += dt; this._fpsN++;
@@ -93,7 +97,9 @@
 
       if (this.current && this.current.render) {
         const c = this.cam, d = this.dpr;
-        ctx.setTransform(d * c.zoom, 0, 0, d * c.zoom, d * (this.width / 2 - c.x * c.zoom), d * (this.height / 2 - c.y * c.zoom));
+        const shx = this.shake ? (Math.random() - 0.5) * this.shake : 0;
+        const shy = this.shake ? (Math.random() - 0.5) * this.shake : 0;
+        ctx.setTransform(d * c.zoom, 0, 0, d * c.zoom, d * (this.width / 2 - c.x * c.zoom + shx), d * (this.height / 2 - c.y * c.zoom + shy));
         try { this.current.render(ctx); } catch (err) { this._sceneError('render', err); }
       }
       if (this.current && this.current.renderUI) {

@@ -83,7 +83,7 @@
 
       const ver = document.createElement('div');
       ver.className = 'menu-version';
-      ver.textContent = 'v1.0.0 · 程序化银河 · 无依赖 · 直接双击 index.html 运行';
+      ver.textContent = 'v1.1.0 · 程序化银河 · 免安装 · 在线游玩或双击 index.html 均可';
       this.overlay.appendChild(ver);
 
       const tips = document.createElement('div');

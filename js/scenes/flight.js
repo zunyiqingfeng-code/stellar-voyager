@@ -55,9 +55,17 @@
           const pts = [];
           const n = 7 + Math.floor(rng.next() * 4);
           for (let i = 0; i < n; i++) pts.push(rng.range(0.7, 1.3));
+          const spr = this.makeRockSprite(pts, r.size, r.rare);
           this.rocks.push({ ...r, x: Math.cos(r.angle) * r.radius, y: Math.sin(r.angle) * r.radius,
-            w: 0.02 * (rng.chance(0.5) ? 1 : -1), maxOre: r.ore, pts, rot: rng.next() * M.TAU, rotV: r.spin });
+            w: 0.02 * (rng.chance(0.5) ? 1 : -1), maxOre: r.ore, pts, rot: rng.next() * M.TAU, rotV: r.spin, spr });
         }
+      }
+
+      // 行星贴图异步预热（每帧生成一张，消除首次视线的微卡顿）
+      this.warmup = [];
+      for (const p of sys.planets) {
+        if (!p._tex) this.warmup.push(p);
+        for (const mo of p.moons) if (!mo._tex) this.warmup.push(mo);
       }
 
       // 海盗
@@ -105,6 +113,26 @@
       this.statsEl = UI.el('ship-stats');
       this.actionsEl = UI.el('hud-actions');
       this.cpEl = UI.el('center-progress');
+
+      // 状态条一次性构建（更新时仅写样式/文本，避免周期性 innerHTML 重建）
+      UI.clear(this.statsEl);
+      this.statRefs = {};
+      const mkBar = (key, lbl, cls) => {
+        const row = document.createElement('div');
+        row.className = 'bar-row';
+        row.innerHTML = '<span class="lbl">' + lbl + '</span><div class="bar ' + cls + '"><i></i></div><span class="val"></span>';
+        this.statsEl.appendChild(row);
+        this.statRefs[key] = { fill: row.querySelector('i'), val: row.querySelector('.val') };
+      };
+      mkBar('shield', '护盾', 'shield');
+      mkBar('armor', '装甲', 'armor');
+      mkBar('hull', '船体', 'hull');
+      const crow = document.createElement('div');
+      crow.className = 'bar-row';
+      crow.style.marginTop = '2px';
+      crow.innerHTML = '<span class="lbl">货舱</span><div class="bar"><i style="background:linear-gradient(90deg,#8a6a1e,#ffd479)"></i></div><span class="val"></span>';
+      this.statsEl.appendChild(crow);
+      this.statRefs.cargo = { fill: crow.querySelector('i'), val: crow.querySelector('.val') };
 
       UI.clear(this.actionsEl);
       const acts = [
@@ -162,12 +190,15 @@
       // 状态条
       const hmax = st.hull, amax = st.armor, smax = st.shield;
       const pct = (cur, max) => Math.max(0, Math.min(100, max > 0 ? cur / max * 100 : 0));
-      this.statsEl.innerHTML =
-        barRow('护盾', pct(ship.hp.shield, smax), 'shield', Math.round(ship.hp.shield) + '/' + Math.round(smax)) +
-        barRow('装甲', pct(ship.hp.armor, amax), 'armor', Math.round(ship.hp.armor) + '/' + Math.round(amax)) +
-        barRow('船体', pct(ship.hp.hull, hmax), 'hull', Math.round(ship.hp.hull) + '/' + Math.round(hmax)) +
-        '<div class="bar-row" style="margin-top:2px"><span class="lbl">货舱</span><div class="bar"><i style="background:linear-gradient(90deg,#8a6a1e,#ffd479);width:' + pct(this.p.cargo.ore + this.p.cargo.rare, st.cargo) + '%"></i></div>' +
-        '<span class="val">矿 ' + Math.floor(this.p.cargo.ore) + ' + 晶 ' + this.p.cargo.rare + ' / ' + Math.round(st.cargo) + '</span></div>';
+      const setBar = (k, p2, txt) => { this.statRefs[k].fill.style.width = p2 + '%'; this.statRefs[k].val.textContent = txt; };
+      setBar('shield', pct(ship.hp.shield, smax), Math.round(ship.hp.shield) + '/' + Math.round(smax));
+      setBar('armor', pct(ship.hp.armor, amax), Math.round(ship.hp.armor) + '/' + Math.round(amax));
+      setBar('hull', pct(ship.hp.hull, hmax), Math.round(ship.hp.hull) + '/' + Math.round(hmax));
+      setBar('cargo', pct(this.p.cargo.ore + this.p.cargo.rare, st.cargo), '矿 ' + Math.floor(this.p.cargo.ore) + ' + 晶 ' + this.p.cargo.rare + ' / ' + Math.round(st.cargo));
+
+      // 低血量红色暗角脉冲
+      const vg = document.getElementById('vignette');
+      if (vg) vg.style.opacity = ship.hp.hull < hmax * 0.32 ? (0.22 + 0.13 * Math.sin(this.t * 5)).toFixed(2) : '0';
 
       // 顶部目标
       if (this.target && this.target.hp) {
@@ -189,6 +220,9 @@
         if (d > this.scan.planet.radius + st.scanRange + 40) this.addWarn('扫描目标超出探测距离', '');
       }
       if (this.canDockNow()) this.addWarn('⇪ 空间站对接窗口内 —— 按 Q 对接', 'good');
+      if (M.dist(this.ship.x, this.ship.y, 0, 0) > this.sys.outerRadius * 0.72 && !this.combatNearby() && !this.warp.active) {
+        this.addWarn('✦ 接近星系边缘 —— 按 M 打开星图进行超空间跃迁', 'good');
+      }
 
       // 对接按钮
       if (this.dockBtn) this.dockBtn.disabled = !this.canDockNow();
@@ -213,11 +247,16 @@
     // ================= 更新 =================
     update(dt) {
       this.t += dt;
+      if (this.respawnT > 0) this.respawnT -= dt;
       if (this.dead) { this.updateDeath(dt); return; }
       if (this.docked || this.paused) return;
 
       S.G.time += dt;
       this.fx.update(dt);
+      if (this.warmup && this.warmup.length) {
+        const wpTex = this.warmup.shift();
+        try { S.PlanetTex.get(wpTex); } catch (e) {}
+      }
       this.handleInput(dt);
       this.moveShip(dt);
       this.updateScan(dt);
@@ -601,7 +640,7 @@
           this.dmgTexts.push({ x: ship.x + M.randomRange(-10, 10), y: ship.y - 16, txt: Math.round(total), ttl: 0.7, color: res.hullDmg > 0 ? '#ff8f6b' : res.armorDmg > 0 ? '#c8d7e8' : '#5ad8ff' });
           this.fx.burst(pr.x, pr.y, 3, { speed: 70, ttl: 0.3, size: 1.4, color: pr.color, kind: 'spark' });
           if (res.shieldDmg > 0) S.Audio.shieldHit();
-          if (res.hullDmg > 0) { S.Audio.hullHit(); if (ship === this.ship) { this.shieldHitT = 0.5; if (Math.random() < 0.3) S.Audio.alarm(); } }
+          if (res.hullDmg > 0) { S.Audio.hullHit(); this.engine.addShake(ship === this.ship ? 2.4 : 1.2); if (ship === this.ship) { this.shieldHitT = 0.5; if (Math.random() < 0.3) S.Audio.alarm(); } }
         }
         if (res.killed) this.onShipDestroyed(ship);
       });
@@ -624,6 +663,7 @@
       // 海盗被击毁
       this.fx && S.explode(this.fx, ship.x, ship.y, 1.2);
       S.Audio.explosion(true);
+      this.engine.addShake(5);
       const bounty = ship.bounty || 60;
       this.p.credits += bounty;
       this.p.kills++;
@@ -652,6 +692,7 @@
       const res = S.Combat.applyDamage(ship, dmg, { shieldMult: 1, armorMult: 1, hullMult: 1, tracking: 0 }, this.fx);
       if (res.missed) return;
       this.dmgTexts.push({ x: ship.x, y: ship.y - 18, txt: Math.round(dmg), ttl: 0.7, color: src === 'heat' ? '#ff7a30' : '#ff8f6b' });
+      this.engine.addShake(src === 'heat' ? 0.35 : 1.4);
       if (ship === this.ship) { this.shieldHitT = 0.4; }
       if (res.killed) this.onShipDestroyed(ship);
     }
@@ -662,7 +703,7 @@
       this.respawnT = 0;
       S.Audio.explosion(true);
       S.explode(this.fx, this.ship.x, this.ship.y, 2.2);
-      this.engine.camerashake = 1;
+      this.engine.addShake(14);
       const penalty = Math.round(this.p.credits * 0.15);
       this.p.credits -= penalty;
       const modal = S.UI.modal({
@@ -997,6 +1038,16 @@
         S.ShipArt.draw(ctx, pk.x, pk.y, pk.angle, pk.hullId, '#ff6b7a', pk.thrustVis || 0.3, this.t, pk.name.length);
         this.drawShipBars(ctx, pk);
       }
+      // 锁定目标环（旋转虚线）
+      if (this.target && this.target.hp && this.target.hp.hull > 0) {
+        const tr = S.ShipArt.radiusFor(this.target.hullId) + 10;
+        ctx.strokeStyle = 'rgba(255,107,122,0.85)';
+        ctx.lineWidth = 1.6 / zoom;
+        ctx.setLineDash([8 / zoom, 6 / zoom]);
+        const ph = this.t * 1.4 % M.TAU;
+        ctx.beginPath(); ctx.arc(this.target.x, this.target.y, tr, ph, ph + M.TAU); ctx.stroke();
+        ctx.setLineDash([]);
+      }
 
       // 玩家
       if (!this.dead && this.respawnT <= 0) {
@@ -1148,6 +1199,37 @@
       }
     }
 
+    /** 小行星精灵预烘焙（避免每帧重建多边形路径，低配机收益大） */
+    makeRockSprite(pts, size, rare) {
+      const res = 2; // 2x 烘焙：缩小绘制开销与内存，画质对小行星足够
+      const half = Math.ceil(size * 1.35 * res) + 2;
+      const s = document.createElement('canvas');
+      s.width = s.height = half * 2;
+      const x = s.getContext('2d');
+      x.translate(half, half);
+      x.beginPath();
+      for (let i = 0; i < pts.length; i++) {
+        const a = i / pts.length * M.TAU;
+        const rr = size * res * pts[i];
+        i === 0 ? x.moveTo(Math.cos(a) * rr, Math.sin(a) * rr) : x.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+      }
+      x.closePath();
+      const grd = x.createLinearGradient(-size * res, -size * res, size * res, size * res);
+      grd.addColorStop(0, rare ? '#8a76a0' : '#7a756a');
+      grd.addColorStop(1, rare ? '#544862' : '#4e4a42');
+      x.fillStyle = grd;
+      x.fill();
+      x.strokeStyle = 'rgba(0,0,0,0.45)';
+      x.lineWidth = res;
+      x.stroke();
+      x.strokeStyle = 'rgba(255,255,240,0.18)';
+      x.lineWidth = res * 0.8;
+      x.beginPath();
+      x.arc(0, 0, size * res * 0.82, -2.4, -0.6);
+      x.stroke();
+      return { img: s, half, res };
+    }
+
     drawRocks(ctx) {
       const c = this.engine.cam;
       const vw = this.engine.width / c.zoom, vh = this.engine.height / c.zoom;
@@ -1161,18 +1243,8 @@
         ctx.save();
         ctx.translate(r.x, r.y);
         ctx.rotate(r.rot);
-        ctx.beginPath();
-        for (let i = 0; i < r.pts.length; i++) {
-          const a = i / r.pts.length * M.TAU;
-          const rr = size * r.pts[i];
-          i === 0 ? ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr) : ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
-        }
-        ctx.closePath();
-        ctx.fillStyle = r.rare ? '#7a6a8a' : '#6e6a60';
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(0,0,0,0.4)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
+        const k = size / (r.size * r.spr.res);
+        ctx.drawImage(r.spr.img, -r.spr.half * k, -r.spr.half * k, r.spr.half * 2 * k, r.spr.half * 2 * k);
         ctx.restore();
       }
     }
@@ -1275,6 +1347,12 @@
       const st = this.sys.station;
       const sa = st.angle + S.G.time * st.orbitSpeed;
       marks.push({ x: Math.cos(sa) * st.orbitRadius, y: Math.sin(sa) * st.orbitRadius, color: '#ffd479' });
+      // 屏外敌舰红箭头（1700m 内）
+      for (const pk of this.pirates) {
+        if (pk.hp.hull <= 0 || pk === this.target) continue;
+        if (M.dist(pk.x, pk.y, this.ship.x, this.ship.y) > 1700) continue;
+        marks.push({ x: pk.x, y: pk.y, color: '#ff6b7a' });
+      }
       // 最近未勘探行星
       let near = null, nd = 1e9;
       for (const p of this.sys.planets) {

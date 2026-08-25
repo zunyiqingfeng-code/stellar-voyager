@@ -93,8 +93,11 @@
       g.addColorStop(0.4, star.glow + 'aa');
       g.addColorStop(1, star.glow + '00');
     }
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(x, y, glowR, 0, M.TAU); ctx.fill();
+    if (star.spec === 'BH' || star.spec === 'NS') {
+      // 黑洞/中子星的光晕保持动态绘制；普通恒星使用下方烘焙精灵（含光晕）
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(x, y, glowR, 0, M.TAU); ctx.fill();
+    }
 
     if (star.spec === 'BH') {
       // 事件视界 + 吸积盘
@@ -131,21 +134,40 @@
       ctx.restore();
       return;
     }
-    // 日面 + 米粒组织噪点
-    ctx.fillStyle = star.color;
-    ctx.beginPath(); ctx.arc(x, y, R, 0, M.TAU); ctx.fill();
-    const rng = new S.Rand(star.name.length * 7919 + star.radius);
-    for (let i = 0; i < 22; i++) {
-      const a = rng.next() * M.TAU, rr = rng.next() * R * 0.85;
-      ctx.fillStyle = 'rgba(255,255,255,' + rng.range(0.03, 0.12) + ')';
-      ctx.beginPath(); ctx.arc(x + Math.cos(a) * rr, y + Math.sin(a) * rr, rng.range(1.5, 4), 0, M.TAU); ctx.fill();
+    if (!star._sprite) {
+      const R = star.radius;
+      const pad = Math.ceil(R * 5);
+      const c = document.createElement('canvas');
+      c.width = c.height = pad * 2;
+      const g2 = c.getContext('2d');
+      // 光晕（静态烘焙）
+      let grad = g2.createRadialGradient(pad, pad, R * 0.2, pad, pad, R * 4.5);
+      grad.addColorStop(0, star.color);
+      grad.addColorStop(0.4, star.glow + 'aa');
+      grad.addColorStop(1, star.glow + '00');
+      g2.fillStyle = grad;
+      g2.beginPath(); g2.arc(pad, pad, R * 4.5, 0, M.TAU); g2.fill();
+      // 日面
+      g2.fillStyle = star.color;
+      g2.beginPath(); g2.arc(pad, pad, R, 0, M.TAU); g2.fill();
+      // 米粒组织噪点
+      const rng = new S.Rand(star.name.length * 7919 + star.radius);
+      for (let i = 0; i < 22; i++) {
+        const a = rng.next() * M.TAU, rr = rng.next() * R * 0.85;
+        g2.fillStyle = 'rgba(255,255,255,' + rng.range(0.03, 0.12).toFixed(2) + ')';
+        g2.beginPath(); g2.arc(pad + Math.cos(a) * rr, pad + Math.sin(a) * rr, rng.range(1.5, 4), 0, M.TAU); g2.fill();
+      }
+      // 边缘亮化
+      const rim = g2.createRadialGradient(pad, pad, R * 0.7, pad, pad, R);
+      rim.addColorStop(0, 'rgba(255,255,255,0)');
+      rim.addColorStop(1, 'rgba(255,255,255,0.35)');
+      g2.fillStyle = rim;
+      g2.beginPath(); g2.arc(pad, pad, R, 0, M.TAU); g2.fill();
+      star._sprite = c;
+      star._pad = pad;
     }
-    // 边缘亮化
-    const rim = ctx.createRadialGradient(x, y, R * 0.7, x, y, R);
-    rim.addColorStop(0, 'rgba(255,255,255,0)');
-    rim.addColorStop(1, 'rgba(255,255,255,0.35)');
-    ctx.fillStyle = rim;
-    ctx.beginPath(); ctx.arc(x, y, R, 0, M.TAU); ctx.fill();
+    const pulse = 1 + Math.sin(time * 1.7 + (star.name.charCodeAt(0) || 0)) * 0.025;
+    ctx.drawImage(star._sprite, x - star._pad * pulse, y - star._pad * pulse, star._sprite.width * pulse, star._sprite.height * pulse);
   }
 
   S.Starfield = Starfield;

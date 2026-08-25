@@ -145,6 +145,15 @@
     });
   };
 
+  // 关闭页面前自动存档（飞行中实时位置也一并保存）
+  window.addEventListener('beforeunload', () => {
+    try {
+      const eng = S.G.engine;
+      if (eng && eng.currentName === 'flight' && eng.current && eng.current.persistPos) eng.current.persistPos();
+      if (S.G.player) S.saveGame();
+    } catch (e) {}
+  });
+
   // ---- 启动 ----
   window.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('game');

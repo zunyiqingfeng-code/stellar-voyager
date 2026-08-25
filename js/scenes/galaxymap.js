@@ -35,20 +35,27 @@
       return sys.links.some(id => this.visited(this.galaxy.systems[id]));
     }
 
-    jumpDistance(fromIdx, toIdx) {
-      // BFS 沿航道
+    /** 可达性缓存：同一出发点只做一次 BFS（此前每帧每星系重复计算） */
+    distMapFrom(fromIdx) {
+      if (this._distMap && this._distFrom === fromIdx) return this._distMap;
       const n = this.galaxy.systems.length;
       const dist = new Array(n).fill(-1);
       dist[fromIdx] = 0;
       const q = [fromIdx];
       while (q.length) {
         const i = q.shift();
-        if (i === toIdx) return dist[i];
         for (const j of this.galaxy.systems[i].links) {
           if (dist[j] < 0) { dist[j] = dist[i] + 1; q.push(j); }
         }
       }
-      return -1;
+      this._distMap = dist;
+      this._distFrom = fromIdx;
+      return dist;
+    }
+
+    jumpDistance(fromIdx, toIdx) {
+      const d = this.distMapFrom(fromIdx)[toIdx];
+      return d == null ? -1 : d;
     }
 
     update(dt) {

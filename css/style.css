@@ -246,3 +246,7 @@ canvas#game { position: fixed; inset: 0; display: block; cursor: crosshair; }
   animation: pulse 1.6s ease infinite; }
 @keyframes pulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
 .boot-splash .b-sub { font-size: 12px; color: var(--txt-dim); letter-spacing: 2px; }
+
+/* ===== 低血量暗角 ===== */
+.vignette { position: absolute; inset: 0; pointer-events: none; z-index: 8;
+  box-shadow: inset 0 0 180px 60px rgba(255,40,50,0.55); transition: opacity .12s linear; }
