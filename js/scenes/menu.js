@@ -10,8 +10,8 @@
       this.t = 0;
       // 装饰行星
       this.demoPlanet = {
-        type: 'continental', radius: 190, seed: 42, isGas: false,
-        name: '远航', cn: '大陆世界'
+        type: 'gaia', radius: 210, seed: 7, isGas: false,
+        name: '远航', cn: '盖亚世界', hires: true
       };
       this.demoAngle = 0.7;
 
@@ -83,7 +83,7 @@
 
       const ver = document.createElement('div');
       ver.className = 'menu-version';
-      ver.textContent = 'v1.1.0 · 程序化银河 · 免安装 · 在线游玩或双击 index.html 均可';
+      ver.textContent = 'v1.2.0 · 程序化银河 · 免安装 · 在线游玩或双击 index.html 均可';
       this.overlay.appendChild(ver);
 
       const tips = document.createElement('div');
@@ -135,9 +135,13 @@
       sh.addColorStop(1, 'rgba(0,0,0,0.75)');
       ctx.fillStyle = sh;
       ctx.beginPath(); ctx.arc(px, py, this.demoPlanet.radius, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = 'rgba(140,200,255,0.4)';
-      ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(px, py, this.demoPlanet.radius + 3, 0, Math.PI * 2); ctx.stroke();
+      // 双层大气辉光（外圈柔晕 + 内圈锐利）
+      ctx.strokeStyle = 'rgba(110,170,255,0.2)';
+      ctx.lineWidth = 9;
+      ctx.beginPath(); ctx.arc(px, py, this.demoPlanet.radius + 7, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = 'rgba(170,225,255,0.7)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(px, py, this.demoPlanet.radius + 2, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
     }
 
